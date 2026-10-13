@@ -47,9 +47,10 @@ class PlayerInteractions extends ChangeNotifier {
   String? _dragAxis;
   Duration? _dragSeekBase;
   Duration? _dragSeekTarget;
-  double _dragBaseVolume = 100;
+  double _dragBaseVolume = 0.5;
   double _dragBaseBrightness = 0.5;
   static double _currentBrightness = 0.5;
+  static double _currentSystemVolume = 0.5;
   static const _deviceChannel = MethodChannel('duanju/device');
   double holdSpeed = 2.0;
   bool _moved = false;
@@ -155,6 +156,32 @@ class PlayerInteractions extends ChangeNotifier {
     } catch (_) {}
   }
 
+  static Future<double> fetchSystemBrightness() async {
+    try {
+      final res =
+          await _deviceChannel.invokeMethod<double>('getSystemBrightness');
+      if (res != null) _currentBrightness = res.clamp(0.01, 1.0);
+    } catch (_) {}
+    return _currentBrightness;
+  }
+
+  static Future<double> fetchSystemVolume() async {
+    try {
+      final res =
+          await _deviceChannel.invokeMethod<double>('getSystemVolume');
+      if (res != null) _currentSystemVolume = res.clamp(0.0, 1.0);
+    } catch (_) {}
+    return _currentSystemVolume;
+  }
+
+  static Future<void> applySystemVolume(double ratio) async {
+    _currentSystemVolume = ratio.clamp(0.0, 1.0);
+    try {
+      await _deviceChannel
+          .invokeMethod('setSystemVolume', {'volume': _currentSystemVolume});
+    } catch (_) {}
+  }
+
   void seekRelative(int seconds) {
     if (!available() || player.state.duration <= Duration.zero) return;
     _endHold();
@@ -189,8 +216,10 @@ class PlayerInteractions extends ChangeNotifier {
     _dragAxis = null;
     _dragSeekBase = null;
     _dragSeekTarget = null;
-    _dragBaseVolume = player.state.volume;
+    _dragBaseVolume = _currentSystemVolume;
     _dragBaseBrightness = _currentBrightness;
+    unawaited(fetchSystemBrightness().then((v) => _dragBaseBrightness = v));
+    unawaited(fetchSystemVolume().then((v) => _dragBaseVolume = v));
     _moved = _held = false;
     _beginHold();
   }
@@ -222,14 +251,16 @@ class PlayerInteractions extends ChangeNotifier {
       if (!_isPortrait && _paneHeight > 0) {
         final deltaPercent = -(delta.dy / (_paneHeight * 0.7));
         if (_origin!.dx < _paneWidth / 2) {
-          _currentBrightness = (_dragBaseBrightness + deltaPercent).clamp(0.05, 1.0);
+          _currentBrightness =
+              (_dragBaseBrightness + deltaPercent).clamp(0.01, 1.0);
           _applyBrightness(_currentBrightness);
           hint('亮度 ${(_currentBrightness * 100).round()}%', persistent: true);
         } else {
-          final targetVol = (_dragBaseVolume + deltaPercent * 100).clamp(0.0, 100.0);
-          unawaited(player.setVolume(targetVol));
-          if (targetVol > 0) _unmutedVolume = targetVol;
-          hint(targetVol == 0 ? '已静音' : '音量 ${targetVol.round()}%', persistent: true);
+          final targetVol =
+              (_dragBaseVolume + deltaPercent).clamp(0.0, 1.0);
+          applySystemVolume(targetVol);
+          final percent = (targetVol * 100).round();
+          hint(percent == 0 ? '已静音' : '音量 $percent%', persistent: true);
         }
       }
       return;
@@ -393,6 +424,7 @@ class PlayerInteractions extends ChangeNotifier {
     _hintTimer?.cancel();
     if (_boosting) unawaited(_setRate(baseSpeed()));
     _boosting = false;
+    unawaited(_applyBrightness(-1.0));
     _playing.cancel();
     _pointers.clear();
     super.dispose();

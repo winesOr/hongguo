@@ -421,12 +421,20 @@ class _PlayerControlsState extends State<PlayerControls> {
                   style: const TextStyle(fontSize: 13),
                 ),
               ),
-            if (compact)
-              _overlayIconButton(
-                tooltip: '旋转与全屏',
-                onPressed: widget.onFullscreen,
-                icon: Icons.screen_rotation_alt_rounded,
-              ),
+            if (compact) ...[
+              if (widget.onPush != null)
+                _overlayIconButton(
+                  tooltip: '投屏',
+                  onPressed: () => _panel(widget.onPush!),
+                  icon: Icons.cast_rounded,
+                ),
+              if (widget.onPictureInPicture != null)
+                _overlayIconButton(
+                  tooltip: '画中画',
+                  onPressed: () => _panel(widget.onPictureInPicture!),
+                  icon: Icons.picture_in_picture_alt_rounded,
+                ),
+            ],
           ],
         ),
       ),
@@ -920,17 +928,14 @@ class _PlayerControlsState extends State<PlayerControls> {
         onPressed: widget.enabled ? () => _panel(widget.onQuality) : null,
         width: 52,
       ),
-      if (widget.onPush != null)
-        _lanPushTool(const ValueKey('fullscreen-lan-push')),
-      if (widget.onPictureInPicture != null)
-        _toolIcon(
-          key: const ValueKey('player-picture-in-picture'),
-          tooltip: '画中画',
-          icon: Icons.picture_in_picture_alt_rounded,
-          onPressed: widget.enabled
-              ? () => _panel(widget.onPictureInPicture!)
-              : null,
-        ),
+      _toolIcon(
+        key: const ValueKey('player-fullscreen-toggle'),
+        tooltip: fullscreen ? '退出全屏' : '全屏',
+        icon: fullscreen
+            ? Icons.fullscreen_exit_rounded
+            : Icons.fullscreen_rounded,
+        onPressed: widget.onFullscreen,
+      ),
     ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(2, 0, 2, 0),
