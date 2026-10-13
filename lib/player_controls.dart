@@ -159,7 +159,11 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   void _interactionChanged() {
     if (!mounted) return;
-    if (widget.interactions.feedback.isNotEmpty) _show();
+    if (widget.interactions.feedback.isNotEmpty &&
+        !widget.interactions.boosting &&
+        !widget.interactions.feedback.contains('倍速')) {
+      _show();
+    }
     setState(() {});
   }
 
@@ -195,15 +199,8 @@ class _PlayerControlsState extends State<PlayerControls> {
   void _tap() {
     if (widget.interactions.suppressTap) return;
     widget.onFocusSurface();
-    if (widget.swipeEnabled &&
-        MediaQuery.orientationOf(context) == Orientation.portrait &&
-        widget.enabled) {
-      widget.onTogglePlayback();
-      _show();
-    } else {
-      setState(() => _visible = !_visible);
-      _scheduleHide();
-    }
+    setState(() => _visible = !_visible);
+    _scheduleHide();
   }
 
   Future<void> _panel(Future<void> Function() open) async {
@@ -234,11 +231,12 @@ class _PlayerControlsState extends State<PlayerControls> {
         : state.position.inMilliseconds / 1000;
     final buffered = state.buffer.inMilliseconds / 1000;
     final visible =
-        _visible ||
-        !state.playing ||
-        state.buffering ||
-        widget.panelOpen ||
-        dragSeeking;
+        !widget.interactions.boosting &&
+        (_visible ||
+            !state.playing ||
+            state.buffering ||
+            widget.panelOpen ||
+            dragSeeking);
     return MouseRegion(
       onHover: (_) => _show(),
       cursor: visible ? SystemMouseCursors.basic : SystemMouseCursors.none,
