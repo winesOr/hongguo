@@ -82,6 +82,10 @@ class _PlayerControlsState extends State<PlayerControls> {
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   Timer? _hideTimer;
   bool _visible = true;
+  bool _locked = false;
+  Timer? _lockIconTimer;
+  bool _showLockIcon = false;
+  Offset? _lastDoubleTapPosition;
   bool _suppressAutoPlaybackStart = false;
   bool _lastPlaying = false;
   double? _seekValue;
@@ -196,9 +200,23 @@ class _PlayerControlsState extends State<PlayerControls> {
     _scheduleHide();
   }
 
+  void _startLockIconFadeTimer() {
+    _lockIconTimer?.cancel();
+    _lockIconTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _locked) {
+        setState(() => _showLockIcon = false);
+      }
+    });
+  }
+
   void _tap() {
     if (widget.interactions.suppressTap) return;
     widget.onFocusSurface();
+    if (_locked) {
+      setState(() => _showLockIcon = !_showLockIcon);
+      if (_showLockIcon) _startLockIconFadeTimer();
+      return;
+    }
     setState(() => _visible = !_visible);
     _scheduleHide();
   }
@@ -213,6 +231,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _lockIconTimer?.cancel();
     widget.interactions.removeListener(_interactionChanged);
     for (final subscription in _subscriptions) {
       subscription.cancel();
@@ -231,6 +250,7 @@ class _PlayerControlsState extends State<PlayerControls> {
         : state.position.inMilliseconds / 1000;
     final buffered = state.buffer.inMilliseconds / 1000;
     final visible =
+        !_locked &&
         !widget.interactions.boosting &&
         (_visible ||
             !state.playing ||
@@ -248,26 +268,51 @@ class _PlayerControlsState extends State<PlayerControls> {
               key: const ValueKey('player-gesture-surface'),
               behavior: HitTestBehavior.opaque,
               onPointerDown: (event) {
+                if (_locked) return;
                 widget.onFocusSurface();
                 widget.interactions.pointerDown(
                   event,
                   swipeEnabled: widget.swipeEnabled,
                   width: constraints.maxWidth,
                   height: constraints.maxHeight,
+                  isPortrait:
+                      MediaQuery.orientationOf(context) == Orientation.portrait,
                 );
               },
-              onPointerMove: widget.interactions.pointerMove,
-              onPointerUp: widget.interactions.pointerUp,
-              onPointerCancel: widget.interactions.pointerCancel,
+              onPointerMove: (event) {
+                if (_locked) return;
+                widget.interactions.pointerMove(event);
+              },
+              onPointerUp: (event) {
+                if (_locked) return;
+                widget.interactions.pointerUp(event);
+              },
+              onPointerCancel: (event) {
+                if (_locked) return;
+                widget.interactions.pointerCancel(event);
+              },
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTap: _tap,
+                onDoubleTapDown: (details) {
+                  _lastDoubleTapPosition = details.localPosition;
+                },
                 onDoubleTap: () {
-                  if (!widget.enabled || widget.interactions.suppressTap) {
+                  if (!widget.enabled || _locked || widget.interactions.suppressTap) {
                     return;
                   }
-                  widget.onTogglePlayback();
-                  _show();
+                  final width = constraints.maxWidth;
+                  final x = _lastDoubleTapPosition?.dx ?? (width / 2);
+                  final isPortrait =
+                      MediaQuery.orientationOf(context) == Orientation.portrait;
+                  if (!isPortrait && x < width * 0.35) {
+                    widget.interactions.seekRelative(-5);
+                  } else if (!isPortrait && x > width * 0.65) {
+                    widget.interactions.seekRelative(5);
+                  } else {
+                    widget.onTogglePlayback();
+                    _show();
+                  }
                 },
               ),
             ),
@@ -333,6 +378,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                 ),
               ),
             ),
+            _screenLockButton(),
             _gestureFeedback(),
           ],
         ),
@@ -1028,22 +1074,102 @@ class _PlayerControlsState extends State<PlayerControls> {
     );
   }
 
+  Widget _screenLockButton() {
+    if (!widget.fullscreen) return const SizedBox.shrink();
+    final bool show = (_visible && !_locked) || (_locked && _showLockIcon);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: AnimatedOpacity(
+          opacity: show ? 1.0 : (_locked ? 0.35 : 0.0),
+          duration: const Duration(milliseconds: 200),
+          child: IgnorePointer(
+            ignoring: !show && !_locked,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.42),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.18),
+                  width: 0.8,
+                ),
+              ),
+              child: IconButton(
+                tooltip: _locked ? '点击解锁' : '锁定屏幕',
+                constraints:
+                    const BoxConstraints.tightFor(width: 44, height: 44),
+                onPressed: () {
+                  setState(() {
+                    _locked = !_locked;
+                    if (_locked) {
+                      _visible = false;
+                      _showLockIcon = true;
+                      _startLockIconFadeTimer();
+                    } else {
+                      _visible = true;
+                      _scheduleHide();
+                    }
+                  });
+                  widget.interactions.hint(_locked ? '屏幕已锁定' : '屏幕已解锁');
+                },
+                icon: Icon(
+                  _locked ? Icons.lock_rounded : Icons.lock_open_rounded,
+                  color: _locked ? const Color(0xFFFFB74D) : Colors.white,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _gestureFeedback() => AnimatedBuilder(
     animation: widget.interactions,
     builder: (context, _) {
       final feedback = widget.interactions.feedback;
       if (feedback.isEmpty) return const SizedBox.shrink();
+      final isHoldSpeed = feedback.contains('倍速');
+      final isVolOrBri =
+          feedback.contains('音量') ||
+          feedback.contains('亮度') ||
+          feedback.contains('静音');
       return IgnorePointer(
         child: Align(
-          alignment: const Alignment(0, -.5),
+          alignment: Alignment(
+            0,
+            isHoldSpeed ? -0.85 : (isVolOrBri ? -0.65 : -0.5),
+          ),
           child: Container(
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black87,
-              borderRadius: BorderRadius.circular(10),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: isHoldSpeed ? 14 : 16,
+              vertical: isHoldSpeed ? 6 : 9,
             ),
-            child: Text(feedback, textAlign: TextAlign.center),
+            decoration: BoxDecoration(
+              color: isHoldSpeed
+                  ? Colors.black.withOpacity(0.42)
+                  : (isVolOrBri
+                      ? Colors.black.withOpacity(0.65)
+                      : Colors.black87),
+              borderRadius: BorderRadius.circular(isHoldSpeed ? 20 : 10),
+              border: isHoldSpeed
+                  ? Border.all(
+                      color: Colors.white.withOpacity(0.18),
+                      width: 0.8,
+                    )
+                  : null,
+            ),
+            child: Text(
+              feedback,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isHoldSpeed ? 12 : 13,
+                color: Colors.white.withOpacity(0.92),
+              ),
+            ),
           ),
         ),
       );

@@ -41,10 +41,17 @@ class PlayerInteractions extends ChangeNotifier {
   Duration _started = Duration.zero;
   double _swipeThreshold = 70;
   double _paneWidth = 0;
+  double _paneHeight = 0;
+  bool _isPortrait = false;
   bool _swipeEnabled = false;
   String? _dragAxis;
   Duration? _dragSeekBase;
   Duration? _dragSeekTarget;
+  double _dragBaseVolume = 100;
+  double _dragBaseBrightness = 0.5;
+  static double _currentBrightness = 0.5;
+  static const _deviceChannel = MethodChannel('duanju/device');
+  double holdSpeed = 2.0;
   bool _moved = false;
   bool _held = false;
   bool _boosting = false;
@@ -103,8 +110,11 @@ class PlayerInteractions extends ChangeNotifier {
       }
       _boosting = true;
       _held = true;
-      unawaited(_setRate(3));
-      hint('3 倍速 · 松开恢复', persistent: true);
+      unawaited(_setRate(holdSpeed));
+      final speedLabel = holdSpeed.truncateToDouble() == holdSpeed
+          ? holdSpeed.toInt().toString()
+          : holdSpeed.toString();
+      hint('$speedLabel 倍速 · 松开恢复', persistent: true);
     });
   }
 
@@ -139,11 +149,28 @@ class PlayerInteractions extends ChangeNotifier {
     hint('');
   }
 
+  static Future<void> _applyBrightness(double value) async {
+    try {
+      await _deviceChannel.invokeMethod('setBrightness', {'brightness': value});
+    } catch (_) {}
+  }
+
+  void seekRelative(int seconds) {
+    if (!available() || player.state.duration <= Duration.zero) return;
+    _endHold();
+    final current = player.state.position.inMilliseconds;
+    final duration = player.state.duration.inMilliseconds;
+    final target = (current + seconds * 1000).clamp(0, duration);
+    unawaited((onSeek ?? player.seek)(Duration(milliseconds: target)));
+    hint('${seconds > 0 ? '快进' : '快退'} ${seconds.abs()} 秒 · ${formatPosition(target / 1000)}');
+  }
+
   void pointerDown(
     PointerDownEvent event, {
     required bool swipeEnabled,
     required double width,
     required double height,
+    bool isPortrait = false,
   }) {
     _pointers.add(event.pointer);
     if (_pointers.length != 1 || _cancelUntilRelease) {
@@ -155,11 +182,15 @@ class PlayerInteractions extends ChangeNotifier {
     _origin = _lastPosition = event.localPosition;
     _started = event.timeStamp;
     _paneWidth = width;
+    _paneHeight = height;
+    _isPortrait = isPortrait;
     _swipeEnabled = swipeEnabled && event.kind == PointerDeviceKind.touch;
     _swipeThreshold = math.max(56, math.min(100, height * .1));
     _dragAxis = null;
     _dragSeekBase = null;
     _dragSeekTarget = null;
+    _dragBaseVolume = player.state.volume;
+    _dragBaseBrightness = _currentBrightness;
     _moved = _held = false;
     _beginHold();
   }
@@ -187,6 +218,22 @@ class PlayerInteractions extends ChangeNotifier {
         : delta.dx.abs() >= delta.dy.abs()
         ? 'x'
         : 'y';
+    if (_dragAxis == 'y') {
+      if (!_isPortrait && _paneHeight > 0) {
+        final deltaPercent = -(delta.dy / (_paneHeight * 0.7));
+        if (_origin!.dx < _paneWidth / 2) {
+          _currentBrightness = (_dragBaseBrightness + deltaPercent).clamp(0.05, 1.0);
+          _applyBrightness(_currentBrightness);
+          hint('亮度 ${(_currentBrightness * 100).round()}%', persistent: true);
+        } else {
+          final targetVol = (_dragBaseVolume + deltaPercent * 100).clamp(0.0, 100.0);
+          unawaited(player.setVolume(targetVol));
+          if (targetVol > 0) _unmutedVolume = targetVol;
+          hint(targetVol == 0 ? '已静音' : '音量 ${targetVol.round()}%', persistent: true);
+        }
+      }
+      return;
+    }
     if (_dragAxis != 'x') return;
     final duration = player.state.duration;
     if (duration <= Duration.zero || _paneWidth <= 0) return;
@@ -216,16 +263,19 @@ class PlayerInteractions extends ChangeNotifier {
     }
     if (_pointer != event.pointer || _origin == null) return;
     final dragSeek = _dragSeekTarget;
+    final dragAxis = _dragAxis;
     final delta = (_lastPosition ?? event.localPosition) - _origin!;
     final swipe =
         dragSeek == null &&
+        dragAxis != 'y' &&
+        _isPortrait &&
         _swipeEnabled &&
         !_held &&
         _moved &&
         delta.dy.abs() >= _swipeThreshold &&
         delta.dy.abs() > delta.dx.abs() * 1.5 &&
         event.timeStamp - _started < const Duration(milliseconds: 1500);
-    if (_moved || _held || dragSeek != null) {
+    if (_moved || _held || dragSeek != null || dragAxis != null) {
       _ignoreTapUntil = DateTime.now().add(const Duration(milliseconds: 600));
     }
     _pointer = null;
@@ -242,6 +292,11 @@ class PlayerInteractions extends ChangeNotifier {
       } else {
         hint('');
       }
+      return;
+    }
+    if (dragAxis == 'y' && !_isPortrait) {
+      _hintTimer?.cancel();
+      _hintTimer = Timer(const Duration(milliseconds: 1000), () => hint(''));
       return;
     }
     if (swipe && available()) hint(onEpisode(delta.dy < 0 ? 1 : -1));
