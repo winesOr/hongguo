@@ -383,6 +383,11 @@ class _PlayerControlsState extends State<PlayerControls> {
               ),
             ),
             _screenLockButton(),
+            _boostingProgressBar(
+              duration: duration,
+              position: position,
+              buffered: buffered,
+            ),
             _gestureFeedback(),
           ],
         ),
@@ -1230,4 +1235,57 @@ class _PlayerControlsState extends State<PlayerControls> {
       );
     },
   );
+
+  Widget _boostingProgressBar({
+    required double duration,
+    required double position,
+    required double buffered,
+  }) {
+    final boosting = widget.interactions.boosting;
+    final progress =
+        duration > 0 ? (position / duration).clamp(0.0, 1.0) : 0.0;
+    final bufferProgress =
+        duration > 0 ? (buffered / duration).clamp(0.0, 1.0) : 0.0;
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: boosting ? 1.0 : 0.0,
+        duration: const Duration(milliseconds: 160),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: Container(
+            height: 2.5,
+            width: double.infinity,
+            color: Colors.black.withOpacity(0.35),
+            child: Stack(
+              children: [
+                if (bufferProgress > 0)
+                  FractionallySizedBox(
+                    widthFactor: bufferProgress,
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      color: Colors.white.withOpacity(0.2),
+                    ),
+                  ),
+                FractionallySizedBox(
+                  widthFactor: progress,
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF765F).withOpacity(0.85),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF765F).withOpacity(0.4),
+                          blurRadius: 2,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
