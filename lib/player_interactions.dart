@@ -329,7 +329,7 @@ class PlayerInteractions extends ChangeNotifier {
       _hintTimer = Timer(const Duration(milliseconds: 1000), () => hint(''));
       return;
     }
-    if (swipe && available()) hint(onEpisode(delta.dy > 0 ? 1 : -1));
+    if (swipe && available()) hint(onEpisode(delta.dy < 0 ? 1 : -1));
   }
 
   void pointerCancel(PointerCancelEvent event) {

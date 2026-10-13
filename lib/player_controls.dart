@@ -413,6 +413,18 @@ class _PlayerControlsState extends State<PlayerControls> {
                   widget.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black87,
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
                 ),
               )
             else
@@ -422,7 +434,18 @@ class _PlayerControlsState extends State<PlayerControls> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 13),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black87,
+                        blurRadius: 4,
+                        offset: Offset(0, 1),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             if (compact) ...[
@@ -897,7 +920,7 @@ class _PlayerControlsState extends State<PlayerControls> {
   }
 
   Widget _mobileControlRow({required bool fullscreen}) {
-    final tools = [
+    final leftTools = [
       _toolText(
         key: const ValueKey('player-episodes'),
         tooltip: '选集',
@@ -923,7 +946,7 @@ class _PlayerControlsState extends State<PlayerControls> {
         tooltip: '倍速',
         label: '${widget.speed}x',
         onPressed: widget.enabled ? () => _panel(widget.onSpeed) : null,
-        width: 50,
+        width: 48,
       ),
       _toolText(
         key: const ValueKey('player-quality'),
@@ -932,26 +955,41 @@ class _PlayerControlsState extends State<PlayerControls> {
         onPressed: widget.enabled ? () => _panel(widget.onQuality) : null,
         width: 52,
       ),
-      if (widget.onCycleFit != null)
+      if (fullscreen && widget.onCycleFit != null)
         _toolText(
           key: const ValueKey('player-fit-mode-mobile'),
           tooltip: '画面比例',
           label: widget.fitLabel,
           onPressed: widget.onCycleFit,
-          width: 52,
+          width: 50,
         ),
-      _toolIcon(
-        key: const ValueKey('player-fullscreen-toggle'),
-        tooltip: fullscreen ? '退出全屏' : '全屏',
-        icon: fullscreen
-            ? Icons.fullscreen_exit_rounded
-            : Icons.fullscreen_rounded,
-        onPressed: widget.onFullscreen,
-      ),
     ];
+    final fullscreenButton = _toolIcon(
+      key: const ValueKey('player-fullscreen-toggle'),
+      tooltip: fullscreen ? '退出全屏' : '全屏',
+      icon: fullscreen
+          ? Icons.fullscreen_exit_rounded
+          : Icons.fullscreen_rounded,
+      onPressed: widget.onFullscreen,
+    );
     return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 0, 2, 0),
-      child: _clusteredToolRow(tools),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: leftTools,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          fullscreenButton,
+        ],
+      ),
     );
   }
 

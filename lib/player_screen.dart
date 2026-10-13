@@ -1277,7 +1277,199 @@ class _PlayerScreenState extends State<PlayerScreen>
     );
   }
 
+  Future<void> _openSpeedSheet() async {
+    if (_panelOpen || _closed) return;
+    _interactions.cancel();
+    setState(() => _panelOpen = true);
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: false,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black54,
+        builder: (sheetContext) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF16171B),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    '播放倍速',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, color: Colors.white12),
+                for (final speed in [3.0, 2.0, 1.5, 1.25, 1.0, 0.75, 0.5])
+                  InkWell(
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await _setPreferences(_preferences.copyWith(speed: speed));
+                    },
+                    child: Container(
+                      height: 46,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            speed == 1.0 ? '1.0x (正常)' : '${speed}x',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: speed == _preferences.speed
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: speed == _preferences.speed
+                                  ? const Color(0xFFFF765F)
+                                  : Colors.white,
+                            ),
+                          ),
+                          if (speed == _preferences.speed) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.check_rounded,
+                              size: 18,
+                              color: Color(0xFFFF765F),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted && !_closed) {
+        setState(() => _panelOpen = false);
+        _playerFocus.requestFocus();
+      }
+    }
+  }
+
+  Future<void> _openQualitySheet() async {
+    if (_panelOpen || _closed) return;
+    _interactions.cancel();
+    setState(() => _panelOpen = true);
+    final qualities = {
+      0,
+      ...(_plan?.qualities ?? []).where((q) => q > 0),
+    }.toList();
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: false,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black54,
+        builder: (sheetContext) => Container(
+          decoration: const BoxDecoration(
+            color: Color(0xFF16171B),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 10),
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    '清晰度',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                const Divider(height: 1, color: Colors.white12),
+                for (final quality in qualities)
+                  InkWell(
+                    onTap: () async {
+                      Navigator.pop(sheetContext);
+                      await _setPreferences(_preferences.copyWith(quality: quality));
+                    },
+                    child: Container(
+                      height: 48,
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            quality == 0 ? '自动 (优先高清)' : '${quality}P',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: quality == _preferences.quality
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                              color: quality == _preferences.quality
+                                  ? const Color(0xFFFF765F)
+                                  : Colors.white,
+                            ),
+                          ),
+                          if (quality == _preferences.quality) ...[
+                            const SizedBox(width: 8),
+                            const Icon(
+                              Icons.check_rounded,
+                              size: 18,
+                              color: Color(0xFFFF765F),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted && !_closed) {
+        setState(() => _panelOpen = false);
+        _playerFocus.requestFocus();
+      }
+    }
+  }
+
   Future<void> _openPanel(PlayerMenuSection section) async {
+    if (section == PlayerMenuSection.speed) return _openSpeedSheet();
+    if (section == PlayerMenuSection.quality) return _openQualitySheet();
     if (_panelOpen || _closed) return;
     _interactions.cancel();
     setState(() => _panelOpen = true);
@@ -1296,7 +1488,7 @@ class _PlayerScreenState extends State<PlayerScreen>
             data: AppTheme.dark,
             child: Builder(
               builder: (themedContext) => Container(
-                height: MediaQuery.sizeOf(sheetContext).height * .72,
+                height: MediaQuery.sizeOf(sheetContext).height * .52,
                 decoration: BoxDecoration(
                   color: Theme.of(themedContext).colorScheme.surface,
                   borderRadius: const BorderRadius.vertical(
@@ -1760,8 +1952,8 @@ class _PlayerScreenState extends State<PlayerScreen>
             danmakuEnabled: _danmakuEnabled,
             danmakuStatus: _danmaku.status,
             onEpisodes: () => _openPanel(PlayerMenuSection.episodes),
-            onSpeed: () => _openPanel(PlayerMenuSection.speed),
-            onQuality: () => _openPanel(PlayerMenuSection.quality),
+            onSpeed: _openSpeedSheet,
+            onQuality: _openQualitySheet,
             onDanmaku: widget.detail.drama.source == 'hongguo'
                 ? _toggleDanmaku
                 : null,
@@ -1942,7 +2134,6 @@ class _PlayerScreenState extends State<PlayerScreen>
 
   Widget _mobileSynopsis(BuildContext context) {
     final drama = widget.detail.drama;
-    final colors = Theme.of(context).colorScheme;
     final meta = [
       SourceSite.byId(drama.source).name,
       if (drama.episodes > 0) '共 ${drama.episodes} 集',
@@ -1952,40 +2143,48 @@ class _PlayerScreenState extends State<PlayerScreen>
     ];
     final body = drama.description.trim().isEmpty ? '暂无简介' : drama.description;
     return ColoredBox(
-      color: colors.surface,
+      color: const Color(0xFF16171B),
       child: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SizedBox(
-                width: 82,
-                height: 123,
-                child: DramaCover(drama: drama, repository: widget.repository),
+                width: 84,
+                height: 126,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: DramaCover(drama: drama, repository: widget.repository),
+                ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       drama.title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      style: const TextStyle(
+                        fontSize: 18,
                         fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
                     if (meta.isNotEmpty) ...[
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 8),
                       Text(
                         meta.join(' · '),
-                        style: TextStyle(color: colors.onSurfaceVariant),
+                        style: const TextStyle(
+                          color: Color(0xFFE2E2E8),
+                          fontSize: 13,
+                        ),
                       ),
                     ],
                     if (drama.onlineDate.isNotEmpty ||
                         drama.heat.isNotEmpty ||
                         drama.views.isNotEmpty) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 6),
                       Text(
                         [
                           if (drama.onlineDate.isNotEmpty)
@@ -1993,7 +2192,10 @@ class _PlayerScreenState extends State<PlayerScreen>
                           if (drama.heat.isNotEmpty) '热度 ${drama.heat}',
                           if (drama.views.isNotEmpty) '播放 ${drama.views}',
                         ].join(' · '),
-                        style: TextStyle(color: colors.onSurfaceVariant),
+                        style: const TextStyle(
+                          color: Color(0xFFB8B8C4),
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ],
@@ -2001,24 +2203,38 @@ class _PlayerScreenState extends State<PlayerScreen>
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           _mobileFollowControl(context, drama),
           if (drama.tags.isNotEmpty) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             Wrap(
               spacing: 6,
               runSpacing: 6,
               children: [
                 for (final tag in drama.tags.take(12))
-                  Chip(label: Text(tag), visualDensity: VisualDensity.compact),
+                  Chip(
+                    label: Text(tag, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    backgroundColor: const Color(0xFF28292E),
+                    visualDensity: VisualDensity.compact,
+                  ),
               ],
             ),
           ],
-          const SizedBox(height: 12),
-          Text(body, style: const TextStyle(height: 1.55)),
+          const SizedBox(height: 16),
+          Text(
+            body,
+            style: const TextStyle(
+              fontSize: 14.5,
+              height: 1.6,
+              color: Color(0xFFEEEEF2),
+            ),
+          ),
           if (widget.detail.warning.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text(widget.detail.warning, style: TextStyle(color: colors.error)),
+            Text(
+              widget.detail.warning,
+              style: const TextStyle(color: Color(0xFFFFB4A8)),
+            ),
           ],
         ],
       ),
@@ -2127,7 +2343,7 @@ class _PlayerScreenState extends State<PlayerScreen>
           data: AppTheme.dark,
           child: Builder(
             builder: (themedContext) => Container(
-              height: MediaQuery.sizeOf(sheetContext).height * .72,
+              height: MediaQuery.sizeOf(sheetContext).height * .56,
               decoration: BoxDecoration(
                 color: Theme.of(themedContext).colorScheme.surface,
                 borderRadius: const BorderRadius.vertical(

@@ -97,7 +97,11 @@ class _PlayerMenuState extends State<PlayerMenu> {
               Expanded(
                 child: Text(
                   title,
-                  style: Theme.of(context).textTheme.titleMedium,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               IconButton(
@@ -329,7 +333,7 @@ class PlayerEpisodeGrid extends StatelessWidget {
     required this.currentIndex,
     required this.onSelected,
     this.keyPrefix = 'play-episode',
-    this.compact = false,
+    this.compact = true,
     this.title = '选集',
   });
   final List<Episode> episodes;
@@ -346,7 +350,7 @@ class PlayerEpisodeGrid extends StatelessWidget {
         : episodes[currentIndex.clamp(0, episodes.length - 1)].number,
     onSelected: onSelected,
     keyPrefix: keyPrefix,
-    compact: compact,
+    compact: true,
     title: title,
   );
 }
