@@ -41,6 +41,8 @@ class PlayerControls extends StatefulWidget {
     this.onSynopsis,
     this.onDownload,
     this.enhancement,
+    this.onCycleFit,
+    this.fitLabel = '自适应',
   });
 
   final Player player;
@@ -73,6 +75,8 @@ class PlayerControls extends StatefulWidget {
   final Future<void> Function()? onSynopsis;
   final Future<void> Function()? onDownload;
   final VideoEnhancementController? enhancement;
+  final VoidCallback? onCycleFit;
+  final String fitLabel;
 
   @override
   State<PlayerControls> createState() => _PlayerControlsState();
@@ -462,38 +466,30 @@ class _PlayerControlsState extends State<PlayerControls> {
     ),
   );
 
-  Widget _centerPlayback(bool playing, {required bool showSkip}) => Center(
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showSkip) ...[
-          IconButton(
-            tooltip: '上一集',
-            onPressed: widget.onPrevious,
-            icon: const Icon(Icons.skip_previous_rounded),
+  Widget _centerPlayback(bool playing, {required bool showSkip}) {
+    if (playing) return const SizedBox.shrink();
+    return Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.42),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withOpacity(0.2),
+            width: 1,
           ),
-          const SizedBox(width: 12),
-        ],
-        IconButton.filledTonal(
-          tooltip: playing ? '暂停播放' : '开始播放',
-          iconSize: 38,
+        ),
+        child: IconButton(
+          tooltip: '开始播放',
+          iconSize: 44,
           onPressed: () {
             widget.onTogglePlayback();
             _show();
           },
-          icon: Icon(playing ? Icons.pause_rounded : Icons.play_arrow_rounded),
+          icon: const Icon(Icons.play_arrow_rounded, color: Colors.white),
         ),
-        if (showSkip) ...[
-          const SizedBox(width: 12),
-          IconButton(
-            tooltip: '下一集',
-            onPressed: widget.onNext,
-            icon: const Icon(Icons.skip_next_rounded),
-          ),
-        ],
-      ],
-    ),
-  );
+      ),
+    );
+  }
 
   Widget _sideDanmakuControl() {
     if (!widget.showDanmaku) return const SizedBox.shrink();
@@ -847,6 +843,14 @@ class _PlayerControlsState extends State<PlayerControls> {
           onPressed: widget.enabled ? () => _panel(widget.onQuality) : null,
           width: 52,
         ),
+        if (widget.onCycleFit != null)
+          _toolText(
+            key: const ValueKey('player-fit-mode-desktop'),
+            tooltip: '画面比例',
+            label: widget.fitLabel,
+            onPressed: widget.onCycleFit,
+            width: 52,
+          ),
       ],
       if (showPush) _lanPushTool(const ValueKey('fullscreen-lan-push')),
       if (showEpisodes)
@@ -928,6 +932,14 @@ class _PlayerControlsState extends State<PlayerControls> {
         onPressed: widget.enabled ? () => _panel(widget.onQuality) : null,
         width: 52,
       ),
+      if (widget.onCycleFit != null)
+        _toolText(
+          key: const ValueKey('player-fit-mode-mobile'),
+          tooltip: '画面比例',
+          label: widget.fitLabel,
+          onPressed: widget.onCycleFit,
+          width: 52,
+        ),
       _toolIcon(
         key: const ValueKey('player-fullscreen-toggle'),
         tooltip: fullscreen ? '退出全屏' : '全屏',

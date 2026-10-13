@@ -107,6 +107,30 @@ class _PlayerScreenState extends State<PlayerScreen>
   late final AnimationController _switchController;
   double _switchDirection = 0;
   bool _autoAdvance = true;
+  BoxFit _videoFit = BoxFit.contain;
+
+  void _cycleVideoFit() {
+    setState(() {
+      if (_videoFit == BoxFit.contain) {
+        _videoFit = BoxFit.cover;
+      } else if (_videoFit == BoxFit.cover) {
+        _videoFit = BoxFit.fill;
+      } else {
+        _videoFit = BoxFit.contain;
+      }
+    });
+    final label = _fitLabel();
+    _interactions.hint('画面比例: $label');
+  }
+
+  String _fitLabel() {
+    return switch (_videoFit) {
+      BoxFit.contain => '适应',
+      BoxFit.cover => '裁切',
+      BoxFit.fill => '铺满',
+      _ => '适应',
+    };
+  }
   bool? _systemFullscreen;
   Orientation? _lastOrientation;
   bool _closed = false;
@@ -1754,6 +1778,8 @@ class _PlayerScreenState extends State<PlayerScreen>
             onNext: _index + 1 < widget.detail.episodes.length
                 ? () => _play(_index + 1)
                 : null,
+            onCycleFit: _cycleVideoFit,
+            fitLabel: _fitLabel(),
           );
     final layeredControls = Stack(
       fit: StackFit.expand,
@@ -1786,7 +1812,7 @@ class _PlayerScreenState extends State<PlayerScreen>
               else
                 Video(
                   controller: _video!,
-                  fit: BoxFit.contain,
+                  fit: _videoFit,
                   controls: (_) => layeredControls,
                 ),
               if (_loading && !hideOverlayForPictureInPicture)
