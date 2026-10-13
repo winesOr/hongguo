@@ -25,6 +25,7 @@ class PlayerMenu extends StatefulWidget {
     required this.onEpisode,
     required this.onPreferences,
     required this.onFavorite,
+    this.isBottomSheet = false,
     this.showDanmaku = false,
     this.danmakuStatus = '',
     this.onRetryDanmaku,
@@ -42,6 +43,7 @@ class PlayerMenu extends StatefulWidget {
   final bool local;
   final bool favorite;
   final bool mobile;
+  final bool isBottomSheet;
   final bool showDanmaku;
   final String danmakuStatus;
   final VoidCallback? onRetryDanmaku;
@@ -86,6 +88,56 @@ class _PlayerMenuState extends State<PlayerMenu> {
       PlayerMenuSection.quality => '清晰度',
       PlayerMenuSection.settings => '播放设置',
     };
+    final content = Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 8, 4, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: '关闭菜单',
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+        ),
+        if (_busy) const LinearProgressIndicator(minHeight: 2),
+        if (_error != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 18,
+              vertical: 8,
+            ),
+            child: Text(
+              _error!,
+              style: const TextStyle(color: Color(0xFFFFB4A8)),
+            ),
+          ),
+        Expanded(
+          child: widget.section == PlayerMenuSection.episodes
+              ? PlayerEpisodeGrid(
+                  episodes: widget.episodes,
+                  currentIndex: widget.currentIndex,
+                  keyPrefix: 'menu-episode',
+                  onSelected: widget.onEpisode,
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
+                  child: _settings(),
+                ),
+        ),
+      ],
+    );
+    if (widget.isBottomSheet) {
+      return content;
+    }
     return Dialog(
       key: const ValueKey('player-menu'),
       alignment: landscape ? Alignment.centerRight : Alignment.bottomCenter,
@@ -94,53 +146,7 @@ class _PlayerMenuState extends State<PlayerMenu> {
       child: SizedBox(
         width: landscape ? math.min(440, size.width * .6) : 600,
         height: landscape ? size.height - 24 : size.height * .72,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 4, 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: '关闭菜单',
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-                ],
-              ),
-            ),
-            if (_busy) const LinearProgressIndicator(minHeight: 2),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 8,
-                ),
-                child: Text(
-                  _error!,
-                  style: const TextStyle(color: Color(0xFFFFB4A8)),
-                ),
-              ),
-            Expanded(
-              child: widget.section == PlayerMenuSection.episodes
-                  ? PlayerEpisodeGrid(
-                      episodes: widget.episodes,
-                      currentIndex: widget.currentIndex,
-                      keyPrefix: 'menu-episode',
-                      onSelected: widget.onEpisode,
-                    )
-                  : SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(18, 4, 18, 20),
-                      child: _settings(),
-                    ),
-            ),
-          ],
-        ),
+        child: content,
       ),
     );
   }

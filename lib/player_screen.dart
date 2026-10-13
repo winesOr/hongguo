@@ -1259,44 +1259,127 @@ class _PlayerScreenState extends State<PlayerScreen>
     setState(() => _panelOpen = true);
     final menuTheme = _showFullscreen ? AppTheme.dark : Theme.of(context);
     try {
-      final index = await showDialog<int>(
-        context: context,
-        builder: (menuContext) => AnimatedBuilder(
-          animation: Listenable.merge([
-            _menuRevision,
-            widget.store,
-            _danmaku,
-            _preloader,
-          ]),
-          builder: (_, _) => Theme(
-            data: menuTheme,
-            child: PlayerMenu(
-              section: section,
-              episodes: widget.detail.episodes,
-              currentIndex: _index,
-              preferences: _preferences,
-              qualities: _plan?.qualities ?? [],
-              actualQuality: _plan?.quality ?? 0,
-              local: _plan?.local == true,
-              favorite: widget.store.isFavorite(widget.detail.drama.id),
-              mobile: _mobile,
-              onEpisode: (index) => Navigator.pop(menuContext, index),
-              onPreferences: _setPreferences,
-              showDanmaku: widget.detail.drama.source == 'hongguo',
-              danmakuStatus: _danmaku.status,
-              onRetryDanmaku: _danmaku.canRetry ? _danmaku.retry : null,
-              preloadStatus: _preloader.status,
-              enhancement: _enhancementForUi,
-              onCompareEnhancement: () {
-                unawaited(_enhancement.toggleCompare());
-                Navigator.pop(menuContext);
-              },
-              onFavorite: () =>
-                  widget.store.toggleFavorite(widget.detail.drama),
+      final useBottomSheet = _mobile && !_showFullscreen;
+      final int? index;
+      if (useBottomSheet) {
+        index = await showModalBottomSheet<int>(
+          context: context,
+          useSafeArea: true,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          barrierColor: Colors.black54,
+          builder: (sheetContext) => Theme(
+            data: AppTheme.dark,
+            child: Builder(
+              builder: (themedContext) => Container(
+                height: MediaQuery.sizeOf(sheetContext).height * .72,
+                decoration: BoxDecoration(
+                  color: Theme.of(themedContext).colorScheme.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(18),
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(18),
+                  ),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 14,
+                        child: Center(
+                          child: Container(
+                            width: 38,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.white24,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: AnimatedBuilder(
+                          animation: Listenable.merge([
+                            _menuRevision,
+                            widget.store,
+                            _danmaku,
+                            _preloader,
+                          ]),
+                          builder: (_, _) => PlayerMenu(
+                            section: section,
+                            isBottomSheet: true,
+                            episodes: widget.detail.episodes,
+                            currentIndex: _index,
+                            preferences: _preferences,
+                            qualities: _plan?.qualities ?? [],
+                            actualQuality: _plan?.quality ?? 0,
+                            local: _plan?.local == true,
+                            favorite: widget.store.isFavorite(widget.detail.drama.id),
+                            mobile: _mobile,
+                            onEpisode: (index) => Navigator.pop(sheetContext, index),
+                            onPreferences: _setPreferences,
+                            showDanmaku: widget.detail.drama.source == 'hongguo',
+                            danmakuStatus: _danmaku.status,
+                            onRetryDanmaku: _danmaku.canRetry ? _danmaku.retry : null,
+                            preloadStatus: _preloader.status,
+                            enhancement: _enhancementForUi,
+                            onCompareEnhancement: () {
+                              unawaited(_enhancement.toggleCompare());
+                              Navigator.pop(sheetContext);
+                            },
+                            onFavorite: () =>
+                                widget.store.toggleFavorite(widget.detail.drama),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
-        ),
-      );
+        );
+      } else {
+        index = await showDialog<int>(
+          context: context,
+          builder: (menuContext) => AnimatedBuilder(
+            animation: Listenable.merge([
+              _menuRevision,
+              widget.store,
+              _danmaku,
+              _preloader,
+            ]),
+            builder: (_, _) => Theme(
+              data: menuTheme,
+              child: PlayerMenu(
+                section: section,
+                episodes: widget.detail.episodes,
+                currentIndex: _index,
+                preferences: _preferences,
+                qualities: _plan?.qualities ?? [],
+                actualQuality: _plan?.quality ?? 0,
+                local: _plan?.local == true,
+                favorite: widget.store.isFavorite(widget.detail.drama.id),
+                mobile: _mobile,
+                onEpisode: (index) => Navigator.pop(menuContext, index),
+                onPreferences: _setPreferences,
+                showDanmaku: widget.detail.drama.source == 'hongguo',
+                danmakuStatus: _danmaku.status,
+                onRetryDanmaku: _danmaku.canRetry ? _danmaku.retry : null,
+                preloadStatus: _preloader.status,
+                enhancement: _enhancementForUi,
+                onCompareEnhancement: () {
+                  unawaited(_enhancement.toggleCompare());
+                  Navigator.pop(menuContext);
+                },
+                onFavorite: () =>
+                    widget.store.toggleFavorite(widget.detail.drama),
+              ),
+            ),
+          ),
+        );
+      }
       if (mounted && !_closed && index != null && index != _index) {
         await _play(index);
       }

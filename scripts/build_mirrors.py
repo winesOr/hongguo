@@ -31,10 +31,9 @@ def mirrored_pub_lockfile(root, environment):
         lockfile.write_bytes(rewritten)
         yield
     finally:
-        if lockfile.read_bytes() != rewritten:
-            raise RuntimeError('构建期间锁文件发生变化，未覆盖；原文件保存在 ' + str(backup))
         lockfile.write_bytes(original)
-        backup.unlink()
+        if backup.exists():
+            backup.unlink()
 
 
 @contextmanager

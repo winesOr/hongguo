@@ -23,7 +23,7 @@ if (releaseKey.exists()) {
 
 android {
     namespace = "com.duanju.duanju_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
     ndkVersion = "28.2.13676358"
 
     compileOptions {

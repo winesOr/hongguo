@@ -298,13 +298,12 @@ class PlayerInteractions extends ChangeNotifier {
     final delta = (_lastPosition ?? event.localPosition) - _origin!;
     final swipe =
         dragSeek == null &&
-        dragAxis != 'y' &&
         _isPortrait &&
         _swipeEnabled &&
         !_held &&
         _moved &&
         delta.dy.abs() >= _swipeThreshold &&
-        delta.dy.abs() > delta.dx.abs() * 1.5 &&
+        delta.dy.abs() > delta.dx.abs() * 1.2 &&
         event.timeStamp - _started < const Duration(milliseconds: 1500);
     if (_moved || _held || dragSeek != null || dragAxis != null) {
       _ignoreTapUntil = DateTime.now().add(const Duration(milliseconds: 600));
@@ -330,7 +329,7 @@ class PlayerInteractions extends ChangeNotifier {
       _hintTimer = Timer(const Duration(milliseconds: 1000), () => hint(''));
       return;
     }
-    if (swipe && available()) hint(onEpisode(delta.dy < 0 ? 1 : -1));
+    if (swipe && available()) hint(onEpisode(delta.dy > 0 ? 1 : -1));
   }
 
   void pointerCancel(PointerCancelEvent event) {
