@@ -35,7 +35,8 @@ abstract final class AppTheme {
 
   static ThemeData _theme(Brightness brightness) {
     final dark = brightness == Brightness.dark;
-    final background = dark ? const Color(0xFF101114) : const Color(0xFFFAF8F6);
+    // 深色走冷灰分层，贴近影视墙，而不是纯黑或暖灰。强调色仍用原橙色。
+    final background = dark ? const Color(0xFF121416) : const Color(0xFFFAF8F6);
     final scheme = ColorScheme.fromSeed(
       seedColor: const Color(0xFFFF664F),
       brightness: brightness,
@@ -48,25 +49,25 @@ abstract final class AppTheme {
           ? const Color(0xFFFFE0D8)
           : const Color(0xFF4B160D),
       tertiary: dark ? const Color(0xFFF6C86B) : const Color(0xFF805500),
-      surface: dark ? const Color(0xFF16171B) : Colors.white,
-      onSurface: dark ? const Color(0xFFF2F0F4) : const Color(0xFF252328),
+      surface: dark ? const Color(0xFF1A1C1F) : Colors.white,
+      onSurface: dark ? const Color(0xFFF3F4F6) : const Color(0xFF252328),
       onSurfaceVariant: dark
-          ? const Color(0xFFB9B6C2)
+          ? const Color(0xFFA7ADB4)
           : const Color(0xFF68636C),
-      outline: dark ? const Color(0xFF85818B) : const Color(0xFF7C757D),
-      outlineVariant: dark ? const Color(0xFF34343D) : const Color(0xFFE3DFDC),
-      surfaceContainerLowest: dark ? const Color(0xFF0D0E11) : Colors.white,
+      outline: dark ? const Color(0xFF8B9198) : const Color(0xFF7C757D),
+      outlineVariant: dark ? const Color(0xFF2A2E33) : const Color(0xFFE3DFDC),
+      surfaceContainerLowest: dark ? const Color(0xFF0E1012) : Colors.white,
       surfaceContainerLow: dark
-          ? const Color(0xFF191A20)
+          ? const Color(0xFF17191C)
           : const Color(0xFFF7F3F0),
       surfaceContainer: dark
-          ? const Color(0xFF1E2026)
+          ? const Color(0xFF1E2125)
           : const Color(0xFFF2EEEB),
       surfaceContainerHigh: dark
-          ? const Color(0xFF25262D)
+          ? const Color(0xFF262A2E)
           : const Color(0xFFEDE8E5),
       surfaceContainerHighest: dark
-          ? const Color(0xFF30313A)
+          ? const Color(0xFF31363B)
           : const Color(0xFFE6E0DC),
       surfaceTint: Colors.transparent,
     );

@@ -347,13 +347,13 @@ class DramaTile extends StatelessWidget {
   final VoidCallback? onLongPress;
 
   static double titleHeight(BuildContext context) =>
-      MediaQuery.textScalerOf(context).scale(15) * 2.6;
+      MediaQuery.textScalerOf(context).scale(13) * 2.5;
 
   static double subtitleHeight(BuildContext context) =>
       MediaQuery.textScalerOf(context).scale(12) * 1.3;
 
   static double extentFor(BuildContext context, double width) =>
-      (width * 1.5 + 13 + titleHeight(context) + subtitleHeight(context))
+      (width * 1.5 + 10 + titleHeight(context) + subtitleHeight(context))
           .ceilToDouble();
 
   static double televisionExtent(BuildContext context, double width) =>
@@ -381,7 +381,25 @@ class DramaTile extends StatelessWidget {
           child: Stack(
             fit: StackFit.expand,
             children: [
-              DramaCover(drama: drama, repository: repository),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    DramaCover(drama: drama, repository: repository),
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: .08)
+                              : Theme.of(context).colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
               if (badge != null && badge!.isNotEmpty)
                 Positioned(
                   left: 6,
@@ -432,7 +450,7 @@ class DramaTile extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 9),
+        const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: SizedBox(
@@ -441,15 +459,16 @@ class DramaTile extends StatelessWidget {
               drama.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
+              style: const TextStyle(
                 fontWeight: FontWeight.w600,
-                height: 1.3,
-                fontSize: 15,
+                height: 1.25,
+                fontSize: 13,
+                letterSpacing: 0.1,
               ),
             ),
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 2),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
           child: SizedBox(
@@ -559,12 +578,17 @@ class StatusPanel extends StatelessWidget {
 }
 
 SliverGridDelegate dramaGridDelegate(BuildContext context, double width) {
-  final columns = width < 600 ? 3 : (width / 180).floor().clamp(4, 9);
-  final spacing = width < 600 ? 10.0 : 18.0;
+  // 手机 3 列、平板约 5 列，间距收紧，海报墙不要被标题行撑松。
+  final columns = width < 520
+      ? 3
+      : width < 840
+      ? 4
+      : (width / 160).floor().clamp(5, 8);
+  final spacing = width < 520 ? 8.0 : 12.0;
   final tileWidth = (width - (columns - 1) * spacing) / columns;
   return SliverGridDelegateWithFixedCrossAxisCount(
     crossAxisCount: columns,
-    mainAxisSpacing: 22,
+    mainAxisSpacing: 14,
     crossAxisSpacing: spacing,
     mainAxisExtent: DramaTile.extentFor(context, tileWidth),
   );
