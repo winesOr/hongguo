@@ -135,7 +135,7 @@ func TestNativeDownloadRangeResumeAndAddressIsolation(t *testing.T) {
 	target := filepath.Join(manager.root, "range.mp4")
 	address := upstream.URL + "/media.mp4"
 	ctx, cancel := context.WithCancel(context.Background())
-	if _, err := manager.downloadFile(ctx, address, "", target, false, func(n, total int64) {
+	if _, err := manager.downloadFile(ctx, address, "", "", target, false, func(n, total int64) {
 		if n >= 4096 {
 			cancel()
 		}
@@ -146,7 +146,7 @@ func TestNativeDownloadRangeResumeAndAddressIsolation(t *testing.T) {
 	if err != nil || part.Size() <= 0 || part.Size() >= int64(len(data)) {
 		t.Fatalf("no resumable partial: %v", err)
 	}
-	if _, err := manager.downloadFile(context.Background(), address, "", target, false, func(int64, int64) {}); err != nil {
+	if _, err := manager.downloadFile(context.Background(), address, "", "", target, false, func(int64, int64) {}); err != nil {
 		t.Fatal(err)
 	}
 	mu.Lock()
@@ -158,7 +158,7 @@ func TestNativeDownloadRangeResumeAndAddressIsolation(t *testing.T) {
 	if !bytes.Equal(got, data) {
 		t.Fatal("range resume corrupted media")
 	}
-	if _, err := manager.downloadFile(context.Background(), upstream.URL+"/other.mp4", "", target, false, func(int64, int64) {}); err != nil {
+	if _, err := manager.downloadFile(context.Background(), upstream.URL+"/other.mp4", "", "", target, false, func(int64, int64) {}); err != nil {
 		t.Fatal(err)
 	}
 	mu.Lock()
@@ -212,7 +212,7 @@ func TestNativeDownloadRangeServersCannotMixFiles(t *testing.T) {
 			if err := os.WriteFile(target+".part", []byte("OLD!"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			_, err := manager.downloadFile(context.Background(), metadata.URL, "", target, false, func(int64, int64) {})
+			_, err := manager.downloadFile(context.Background(), metadata.URL, "", "", target, false, func(int64, int64) {})
 			if mode == "invalid" {
 				if err == nil {
 					t.Fatal("accepted an invalid range")
@@ -260,7 +260,7 @@ func TestNativeDownloadIncompleteMediaAndInvalidKeyStayIncomplete(t *testing.T) 
 			t.Cleanup(upstream.Close)
 			manager := downloadTestManager(t)
 			target := filepath.Join(manager.root, "incomplete.mp4")
-			_, err := manager.downloadFile(context.Background(), upstream.URL, "", target, mode == "key", func(int64, int64) {})
+			_, err := manager.downloadFile(context.Background(), upstream.URL, "", "", target, mode == "key", func(int64, int64) {})
 			if err == nil {
 				t.Fatal("invalid media marked completed")
 			}

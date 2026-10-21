@@ -55,6 +55,14 @@ func nativePlaybackChoices(media providerMedia, quality int) nativePlaybackChoic
 	return choice
 }
 
+// 站源显式指定 UA 时优先使用（例如红果官网公开预览流只对桌面 Chrome UA 放行）。
+func routeUserAgent(media providerMedia) string {
+	if media.UserAgent != "" {
+		return media.UserAgent
+	}
+	return userAgent
+}
+
 func (engine *nativeEngine) nativeOpenPlayback(ctx context.Context, choice nativePlaybackChoice) (nativePlan, error) {
 	if err := ctx.Err(); err != nil {
 		return nativePlan{}, err
@@ -73,7 +81,7 @@ func (engine *nativeEngine) nativeOpenPlayback(ctx context.Context, choice nativ
 	}
 	plan := nativePlan{
 		DanmakuID: choice.danmakuVideo,
-		URL:       media.URL, Headers: map[string]string{"User-Agent": userAgent, "Referer": media.Referer},
+		URL:       media.URL, Headers: map[string]string{"User-Agent": routeUserAgent(media), "Referer": media.Referer},
 		Key: hex.EncodeToString(media.CENCKey), Quality: media.Quality, Qualities: choice.qualities,
 		RouteIndex: choice.index, RouteCount: len(choice.media), Session: hex.EncodeToString(tokenBytes),
 	}

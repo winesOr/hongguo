@@ -13,6 +13,9 @@ type providerMedia struct {
 	credentials *providerMediaCredentials
 	URL         string
 	Referer     string
+	// UserAgent 非空时，本地流代理与下载都沿用它；
+	// 部分站点（如红果官网公开预览流）只对特定 UA 放行。
+	UserAgent   string
 	Duration    time.Duration
 	Playlist    string
 	HLSKey      []byte

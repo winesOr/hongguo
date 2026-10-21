@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"regexp"
 	"slices"
@@ -15,6 +17,18 @@ import (
 )
 
 const hongguoBaseURL = "https://hongguoduanju.com"
+
+// 官网公开预览流只对桌面浏览器 UA 放行：同一地址用移动端 UA 恒 404，
+// 换桌面 Chrome UA 必定 206。播放器经本地代理取流时必须沿用这个 UA。
+const hongguoPublicUserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " +
+	"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+// 公开预览流的边缘节点会间歇性 404（FaaS 按需生成 + 上游限流），
+// 重试次数与退避间隔要留足，否则会被判定为突发请求而连续 404。
+const (
+	hongguoPublicMediaAttempts = 4
+	hongguoPublicMediaBackoff  = 2 * time.Second
+)
 
 func (d *Downloader) fetchHongguoDramas(ctx context.Context) ([]Drama, error) {
 	initialized := hongguoCatalogInitialized(d.hongguoCatalogSnapshot())
@@ -212,11 +226,81 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if err := ctx.Err(); err != nil {
 		return providerMedia{}, err
 	}
+	// 官网为 SEO 暴露的公开预览流：游客可用，但只有 360p。
+	// 这是目前唯一在 App 签名失效后仍能真实出流的通道。
+	media, publicErr := d.resolveHongguoPublicMedia(ctx, videoID)
+	if publicErr == nil {
+		return media, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return providerMedia{}, err
+	}
 	media, apiErr := d.resolveHongguoPlaybackAPI(ctx, seriesID, videoID)
 	if apiErr == nil {
 		return media, nil
 	}
-	return providerMedia{}, fmt.Errorf("红果 App 取流失败：%v；网页取流失败：%v；备用取流失败：%w", publicError(nativeErr), publicError(pageErr), apiErr)
+	return providerMedia{}, fmt.Errorf("红果 App 取流失败：%v；网页取流失败：%v；公开预览流失败：%v；备用取流失败：%w",
+		publicError(nativeErr), publicError(pageErr), publicError(publicErr), apiErr)
+}
+
+// 红果官网公开预览流。
+//
+// 播放页 HTML 里直接带着 https://hongguoduanju.com/video/public/<vid>/360p.mp4，
+// 该地址由 FaaS 按需生成（响应头可见 X-Powered-By: Goofy Node 与极新的 Last-Modified），
+// 边缘节点会间歇性返回 404，因此必须重试；实测同一 URL 会 404/206 交替。
+// 只有 360p，更高清晰度在公开路径上不存在（480p/720p/1080p 恒 404）。
+func (d *Downloader) resolveHongguoPublicMedia(ctx context.Context, videoID string) (providerMedia, error) {
+	if !hongguoNumericID.MatchString(videoID) {
+		return providerMedia{}, errors.New("红果视频 ID 无效")
+	}
+	address := hongguoBaseURL + "/video/public/" + videoID + "/360p.mp4"
+	var lastErr error
+	for attempt := 0; attempt < hongguoPublicMediaAttempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-time.After(time.Duration(attempt) * hongguoPublicMediaBackoff):
+			case <-ctx.Done():
+				return providerMedia{}, ctx.Err()
+			}
+		}
+		ok, err := d.probeHongguoPublicMedia(ctx, address)
+		if ok {
+			return providerMedia{
+				URL:       address,
+				Quality:   360,
+				Referer:   hongguoBaseURL + "/",
+				UserAgent: hongguoPublicUserAgent,
+			}, nil
+		}
+		if err != nil {
+			lastErr = err
+			if ctx.Err() != nil {
+				return providerMedia{}, ctx.Err()
+			}
+		}
+	}
+	if lastErr == nil {
+		lastErr = errors.New("红果公开预览流暂不可用（边缘节点抖动，可稍后重试）")
+	}
+	return providerMedia{}, lastErr
+}
+
+// 只取头部 1KB 探活，避免把整集视频拉进内存。
+func (d *Downloader) probeHongguoPublicMedia(ctx context.Context, address string) (bool, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	if err != nil {
+		return false, err
+	}
+	request.Header.Set("Range", "bytes=0-1023")
+	request.Header.Set("Referer", hongguoBaseURL+"/")
+	request.Header.Set("User-Agent", hongguoPublicUserAgent)
+	response, err := d.doCatalogRequestWithTimeout(request, 15*time.Second)
+	if err != nil {
+		return false, err
+	}
+	defer response.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 1024))
+	return response.StatusCode == http.StatusPartialContent || response.StatusCode == http.StatusOK, nil
 }
 
 func (d *Downloader) resolveHongguoWebMedia(ctx context.Context, seriesID, videoID string) (providerMedia, error) {

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 )
 
@@ -60,12 +61,23 @@ func (engine *nativeEngine) nativeRecommendations(ctx context.Context, input nat
 	}
 	page, err := engine.downloader.fetchHongguoRecommendations(ctx, state.Query)
 	if err != nil {
-		if len(cached.Items) == 0 || errors.Is(err, context.Canceled) {
+		if len(cached.Items) > 0 && !errors.Is(err, context.Canceled) {
+			cached.Fresh = false
+			cached.Warning = joinNativeWarnings(cached.Warning, publicError(err).Error())
+			return cached, nil
+		}
+		if errors.Is(err, context.Canceled) {
 			return nativeCatalogResult{}, err
 		}
-		cached.Fresh = false
-		cached.Warning = joinNativeWarnings(cached.Warning, publicError(err).Error())
-		return cached, nil
+		// 红果官方推荐已因字节风控失效；回退到实测可用的站源，
+		// 否则首页会整页空白。
+		if fallback, source, ferr := engine.recommendationFallback(ctx); ferr == nil {
+			fallback.Fresh = true
+			fallback.Warning = joinNativeWarnings(fallback.Warning,
+				"红果推荐暂不可用，已改用「"+source+"」站源")
+			return fallback, nil
+		}
+		return nativeCatalogResult{}, err
 	}
 	if err := ctx.Err(); err != nil {
 		return nativeCatalogResult{}, err
@@ -124,4 +136,58 @@ func (engine *nativeEngine) nativeRecommendations(ctx context.Context, input nat
 		result.Fresh, result.Warning, result.saveError = false, err.Error(), err
 	}
 	return result, nil
+}
+
+// 红果推荐不可用时的备用站源顺序，按实测「目录→详情→取流」全通排列。
+var recommendationFallbackSources = []struct {
+	source string
+	name   string
+	fetch  func(*Downloader, context.Context) ([]Drama, error)
+}{
+	{sourceHeguo, "河果", func(d *Downloader, ctx context.Context) ([]Drama, error) {
+		items, _, err := d.fetchHeguoCatalogPage(ctx, 1, "")
+		return items, err
+	}},
+	{sourceMaoguo, "猫果", func(d *Downloader, ctx context.Context) ([]Drama, error) {
+		items, _, err := d.fetchMaoguoCatalogPage(ctx, 1, "")
+		return items, err
+	}},
+	{sourceYaguo, "芽果", func(d *Downloader, ctx context.Context) ([]Drama, error) {
+		items, _, err := d.fetchYaguoCatalogPage(ctx, 1, "")
+		return items, err
+	}},
+	{sourceFanguo, "饭果", func(d *Downloader, ctx context.Context) ([]Drama, error) {
+		items, _, err := d.fetchFanguoCatalogPage(ctx, 1, "")
+		return items, err
+	}},
+}
+
+// recommendationFallback 依次尝试备用站源，返回第一个有内容的目录。
+func (engine *nativeEngine) recommendationFallback(ctx context.Context) (nativeCatalogResult, string, error) {
+	var failures []error
+	for _, candidate := range recommendationFallbackSources {
+		if err := ctx.Err(); err != nil {
+			return nativeCatalogResult{}, "", err
+		}
+		items, err := candidate.fetch(engine.downloader, ctx)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", candidate.name, err))
+			continue
+		}
+		seen := make(map[string]bool, len(items))
+		result := nativeCatalogResult{HasMore: true}
+		for _, drama := range items {
+			if drama.ID == "" || seen[drama.ID] {
+				continue
+			}
+			seen[drama.ID] = true
+			result.Items = append(result.Items, nativeNormalize(drama))
+		}
+		if len(result.Items) == 0 {
+			failures = append(failures, fmt.Errorf("%s: 目录为空", candidate.name))
+			continue
+		}
+		return result, candidate.name, nil
+	}
+	return nativeCatalogResult{}, "", errors.Join(failures...)
 }
