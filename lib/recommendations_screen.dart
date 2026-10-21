@@ -9,6 +9,8 @@ import 'local_store.dart';
 import 'models.dart';
 import 'playback_launch_screen.dart';
 import 'remote_widgets.dart';
+import 'vidhub_ambient.dart';
+import 'vidhub_hero.dart';
 import 'widgets.dart';
 
 class RecommendationsScreen extends StatefulWidget {
@@ -45,6 +47,24 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
   bool _failedMore = false;
   String? _error;
   int _generation = 0;
+
+  /// VidHub 式全屏流光氛围色，跟随当前海报 / 当前焦点卡片变化。
+  Color _tone = AmbientPalette.fallback;
+  int _toneGeneration = 0;
+
+  /// 解析某部剧的封面并更新氛围色。失败静默保持上一次的色调。
+  Future<void> _applyTone(Drama drama) async {
+    final generation = ++_toneGeneration;
+    try {
+      final path = await widget.repository.cover(drama);
+      if (!mounted || generation != _toneGeneration) return;
+      final tone = await AmbientPalette.fromCoverFile(path);
+      if (!mounted || generation != _toneGeneration) return;
+      if (tone != _tone) setState(() => _tone = tone);
+    } catch (_) {
+      // 取不到封面就沿用当前氛围色，不打断浏览。
+    }
+  }
 
   @override
   void initState() {
@@ -135,16 +155,17 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
           onExitDown: () => widget.gridKey?.currentState?.focusCurrent(),
           trailing: widget.embedded ? refresh : null,
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              '公开推荐 · 已加载 ${_items.length} 部',
-              style: Theme.of(context).textTheme.bodySmall,
+        if (AppLayout.isTelevision(context))
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '公开推荐 · 已加载 ${_items.length} 部',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ),
           ),
-        ),
         if (_loading && _items.isNotEmpty)
           const LinearProgressIndicator(minHeight: 2),
         if (_error != null && _items.isNotEmpty)
@@ -219,7 +240,11 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                             drama: drama,
                             repository: widget.repository,
                             focusNode: node,
-                            onFocus: onFocus,
+                            onFocus: () {
+                              onFocus();
+                              // TV 上把当前焦点卡片的氛围色投到全屏流光。
+                              unawaited(_applyTone(drama));
+                            },
                             onTap: () => unawaited(
                               openPlaybackDirectly(
                                 context,
@@ -238,8 +263,40 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                       controller: _scroll,
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
+                        // VidHub 式悬浮海报轮播：卡片不占满屏宽，左右微露邻卡。
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.only(top: 4, bottom: 2),
+                            child: VidHubHero(
+                              items: _items,
+                              repository: widget.repository,
+                              onOpen: (drama) => unawaited(
+                                openPlaybackDirectly(
+                                  context,
+                                  drama: drama,
+                                  repository: widget.repository,
+                                  store: widget.store,
+                                ),
+                              ),
+                              onTone: (tone) {
+                                if (mounted && tone != _tone) {
+                                  setState(() => _tone = tone);
+                                }
+                              },
+                            ),
+                          ),
+                        ),
+                        SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 2),
+                            child: Text(
+                              '公开推荐 · 已加载 ${_items.length} 部',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        ),
                         SliverPadding(
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
                           sliver: SliverGrid(
                             gridDelegate: dramaGridDelegate(
                               context,
@@ -295,10 +352,23 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
         ),
       ],
     );
-    if (widget.embedded) return content;
+    // 全屏流光背景垫在最底层，内容浮在其上；
+    // 这样氛围色可以跨过状态栏与导航栏区域，形成 VidHub 那种大景深光场。
+    final themed = Stack(
+      fit: StackFit.expand,
+      children: [
+        AmbientGlow(
+          color: _tone,
+          baseColor: Theme.of(context).scaffoldBackgroundColor,
+        ),
+        content,
+      ],
+    );
+    if (widget.embedded) return themed;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(title: const Text('红果推荐'), actions: [refresh]),
-      body: SafeArea(top: false, child: content),
+      body: SafeArea(top: false, child: themed),
     );
   }
 }
