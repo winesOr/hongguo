@@ -212,8 +212,6 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if !hongguoNumericID.MatchString(videoID) || !hongguoNumericID.MatchString(seriesID) {
 		return providerMedia{}, fmt.Errorf("红果章节 ID 无效，请重新获取章节")
 	}
-	// 首选 openhongguo 匿名 SDK：自带 x-gorgon/x-ladon/x-helios/x-medusa 全套签名
-	// 与 CENC spade_a 密钥还原，实测可出官方 1080p，且不受「前 50 集」限制。
 	media, sdkErr := d.resolveHongguoSDKMedia(ctx, videoID)
 	if sdkErr == nil {
 		return media, nil

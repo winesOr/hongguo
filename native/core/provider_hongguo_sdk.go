@@ -20,19 +20,6 @@ import (
 	"github.com/beilunyang/openhongguo/sdk/model"
 )
 
-// 红果 App 官方取流（openhongguo 匿名 SDK）。
-//
-// 本项目自带的 signHongguoRequest 只实现了 x-gorgon，字节网关在
-// /novel/player/video_model 上要求 x-gorgon + x-ladon + x-helios + x-medusa 全套签名，
-// 因此旧通道必然被拦（HTTP 200 + 空包体）。
-//
-// openhongguo 用纯 Go 复刻了整套签名（含 SM3、变种 MD5、protobuf、AES 变体），
-// 并用 CENC spade_a 反混淆还原内容密钥，所以这条通道能拿到官方全清晰度
-// （实测 360p/480p/540p/720p/1080p）以及第 51 集之后的内容。
-//
-// SDK 以匿名设备身份请求，设备档案落盘到 dataDir，跨启动复用；
-// 服务端拒绝设备时（ErrDeviceRejected）自动重置设备后重试一次。
-
 const hongguoSDKProfileName = "hongguo_anonymous.json"
 
 type hongguoSDKState struct {
@@ -69,7 +56,6 @@ func (downloader *Downloader) hongguoSDKClient() (*sdk.Client, error) {
 	return client, nil
 }
 
-// hongguoSDKPlayback 解析一集的官方播放模型。设备被拒时重置匿名设备并重试一次。
 func (downloader *Downloader) hongguoSDKPlayback(ctx context.Context, client *sdk.Client, videoID string) (*model.Playback, error) {
 	playback, err := client.ResolvePlayback(ctx, videoID, sdk.PlaybackOptions{})
 	if playback != nil && (err == nil || errors.Is(err, sdk.ErrDRMProtected)) {
@@ -117,7 +103,6 @@ func (downloader *Downloader) resolveHongguoSDKMedia(ctx context.Context, videoI
 	}
 	var choices []scoredMedia
 	for _, stream := range playback.Streams {
-		// 分段（DASH）表示形式需要 init/index 区间拼装，本地代理只处理单文件流。
 		if stream.Dash {
 			continue
 		}
