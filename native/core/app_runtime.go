@@ -56,6 +56,7 @@ type Downloader struct {
 	proxyRouter           *proxyRouter
 	hongguoOnce           sync.Once
 	hongguo               *hongguoAppClient
+	hongguoSDK            hongguoSDKState
 	huangjuOnce           sync.Once
 	huangju               *huangjuAPIClient
 	yeguoOnce             sync.Once

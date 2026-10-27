@@ -212,6 +212,15 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if !hongguoNumericID.MatchString(videoID) || !hongguoNumericID.MatchString(seriesID) {
 		return providerMedia{}, fmt.Errorf("红果章节 ID 无效，请重新获取章节")
 	}
+	// 首选 openhongguo 匿名 SDK：自带 x-gorgon/x-ladon/x-helios/x-medusa 全套签名
+	// 与 CENC spade_a 密钥还原，实测可出官方 1080p，且不受「前 50 集」限制。
+	media, sdkErr := d.resolveHongguoSDKMedia(ctx, videoID)
+	if sdkErr == nil {
+		return media, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return providerMedia{}, err
+	}
 	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
 	if nativeErr == nil {
 		return media, nil
@@ -239,8 +248,8 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if apiErr == nil {
 		return media, nil
 	}
-	return providerMedia{}, fmt.Errorf("红果 App 取流失败：%v；网页取流失败：%v；公开预览流失败：%v；备用取流失败：%w",
-		publicError(nativeErr), publicError(pageErr), publicError(publicErr), apiErr)
+	return providerMedia{}, fmt.Errorf("红果 SDK 取流失败：%v；App 取流失败：%v；网页取流失败：%v；公开预览流失败：%v；备用取流失败：%w",
+		publicError(sdkErr), publicError(nativeErr), publicError(pageErr), publicError(publicErr), apiErr)
 }
 
 // 红果官网公开预览流。
